@@ -1,0 +1,141 @@
+---
+title: "Capstone IDV Admission prediction"
+author: "Bush Daniel Kwajaffa"
+date: "6/3/2020"
+output: pdf_document
+---
+
+# Introduction
+Admission today is being affected by many factors and some of the things to be considered before being admitted are; CGPA, GRE.Score, TOEFL.Score, A statement of purpose (SOP), Letter of Recommendation (LOR), university rating and Research. In this project we will use the above mention criteria to create a model that will predict the admittance for a new student.
+Different models will be used to get the best out, the models that will be are linear regression, logistic regression and randomForest.
+The Root Mean Square Error (RMSE) will be used to evaluate the model performance. RMSE is a measure of how spread out the residuals are, it measures how concentrated the data is around the line of best fit. Models will be developed to compare RMSE in order to assess highest quality. The best resulting model will be used to predict the admittance.
+
+# Methodology and Analysis
+Fisrtly we will load all required packages and get our data ready.
+Loading required packages.
+
+```{r setup, echo=TRUE}
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+if(!require(RCurl)) install.packages("RCurl", repos = "http://cran.us.r-project.org")
+if(!require(ggplot2)) install.packages("ggplot2", repos = "http://cran.us.r-project.org")
+if(!require(corrplot)) install.packages("corrplot", repos = "http://cran.us.r-project.org")
+if(!require(gridExtra)) install.packages("gridExtra", repos = "http://cran.us.r-project.org")
+if(!require(randomForest)) install.packages("randomForest", repos = "http://cran.us.r-project.org")
+
+```
+
+Downloading and importing data. 
+
+```{r, echo=TRUE}
+urlfile <- "https://raw.github.com/bushdanielkwajaffa/edxcapstone2/master/Admission_Predict.csv"
+Admission <- read.csv(urlfile)
+```
+
+# Analysis and Data visualization
+Summary
+
+```{r, Admission-summary}
+summary(Admission)
+```
+From the summary we have 400 rows, GRE.Score; 290-340, TOEFL.Score; 92-120, University rating; 1-5, SOP; 1-5, LOR; 1-5, CGPA; 6.8-9.920 and we see some of the canditates have no record of research.
+\pagebreak
+
+Lets look at a bar chart of with research and no research.
+
+```{r, echo=FALSE}
+research <- table(Admission$Research)
+barplot(research,
+        col=rainbow(2),
+        legend=rownames(research),
+        main="Barplot of Research",
+        xlab="Research",
+        ylab="Count")
+
+```
+
+We see just a difference of 38 individuals.
+\pagebreak
+Lets look at plot of the other criteria in relation to Chance of Admittance being distributed on research.
+
+```{r, echo=FALSE}
+p1 <- ggplot(Admission, aes(Chance.of.Admit, TOEFL.Score)) +geom_point(aes(color=factor(Research), alpha=0.5, size=2.0)) + theme_bw()
+p2 <- ggplot(Admission, aes(Chance.of.Admit, GRE.Score)) + geom_point(aes(color=factor(Research), alpha=0.5, size=2.0)) + theme_bw()
+p3 <- ggplot(Admission, aes(Chance.of.Admit, CGPA)) + geom_point(aes(color=factor(Research), alpha=0.5, size=2.0)) + theme_bw()
+p4 <- ggplot(Admission, aes(Chance.of.Admit, University.Rating)) + geom_point(aes(color=factor(Research), alpha=0.5, size=2.0)) + theme_bw()
+p5 <- ggplot(Admission, aes(Chance.of.Admit, SOP)) + geom_point(aes(color=factor(Research), alpha=0.5, size=2.0)) + theme_bw()
+p6 <- ggplot(Admission, aes(Chance.of.Admit, LOR)) + geom_point(aes(color=factor(Research), alpha=0.5, size=2.0)) + theme_bw()
+
+grid.arrange(p1,p2,p3,p4,p5,p6)
+```
+
+\pagebreak
+
+
+
+The corrolation of the criteria shows which of the criteria has strong relation with chance of admittance. Which in this case is CGPA. 
+
+
+```{r, echo=FALSE}
+num.cols <- sapply(Admission, is.numeric)
+cors <-cor(Admission[,num.cols])
+corrplot(cors)
+```
+
+# Analysis
+Data validation
+
+```{r, echo=TRUE}
+set.seed(222, sample.kind = "Rounding")
+test_index <- createDataPartition(Admission$GRE.Score, times = 1, p= 0.7, list = F)
+train_set <- Admission %>% slice(-test_index)
+test_set <- Admission %>% slice(test_index)
+```
+
+Modelling using linear regression
+
+```{r, echo=TRUE, message=TRUE}
+fit_lm <- lm(Chance.of.Admit ~ ., data = train_set)
+y_hat_lm <- predict(fit_lm, test_set)
+
+#calculating root mean square error for linear regression
+rmse_lm <- sqrt(mean((y_hat_lm-test_set$Chance.of.Admit)^2))
+rmse_lm
+```
+
+Modelling using logistic regression
+
+```{r, echo=TRUE, message=TRUE}
+fit_glm <- glm(Chance.of.Admit ~ ., data = train_set)
+y_hat_glm <- predict(fit_glm, test_set, type= "response")
+
+#Calculating root mean square error for logistic regression
+rmse_glm <- sqrt(mean((y_hat_glm-test_set$Chance.of.Admit)^2))
+rmse_glm
+```
+
+Modelling using randomForest
+
+```{r, echo=TRUE, message=TRUE}
+fit_rf <- randomForest(Chance.of.Admit~., train_set)
+y_hat_rf <- predict(fit_rf, test_set)
+
+#Calculating root mean square error for randomForest
+rmse_rf <- sqrt(mean(y_hat_rf-test_set$Chance.of.Admit)^2)
+rmse_rf
+```
+
+# Result
+Looking at the table below, randomForest has the lowest root mean square error making it the best model
+
+```{r, echo=TRUE}
+rmse <- matrix(c(rmse_lm, rmse_glm, rmse_rf),ncol=1,byrow=TRUE)
+colnames(rmse) <- c("RMSE")
+rownames(rmse) <- c("rmse_lm","rmse_glm","rmse_rf")
+rmse <- as.table(rmse)
+rmse
+```
+
+# Conclusion
+From the results we see that randomForest has the least RMSE which makes it the best model for predicting admittance into university.
